@@ -22,7 +22,7 @@ mkdir -p recon && cd recon || exit
 echo "[*] Enumerating subdomains..."
 $SUBFINDER -d "$TARGET" -silent > subfinder.txt
 $ASSETFINDER --subs-only "$TARGET" > assetfinder.txt
-$AMASS enum -passive -d "$TARGET" -timeout 2 -o amass.txt
+$AMASS enum -passive -d "$TARGET" -timeout 10 -max-dns-queries 200 -silent -o amass.txt
 
 # Sorting and Removing all the dublicates
 echo "[*] Sorting and Removing all dublicated" 
@@ -33,12 +33,13 @@ cat subfinder.txt assetfinder.txt amass.txt \
 
 # Probe Live Hosts (CLEAN output)
 echo "[*] Probing live hosts..."
+$HTTPX -l all_subs.txt -silent -o live.txt
 $HTTPX -l all_subs.txt \
   -status-code \
   -title \
   -tech-detect \
   -content-length \
-  -o live.txt
+  -o live_info.txt
 
 # Katana  url crawleling 
 echo "[*] Crawling with Katana"
@@ -51,29 +52,83 @@ $KATANA -list live.txt \
   -o katana.txt
 
 
-# Nuclei Scan
-#echo "[*] Running Nuclei scans..."
-#nuclei -l katana.txt -severity medium,high,critical \
-#	-o nuclei_results.txt
+    # Nuclei Scan
+    #best real-world
+# echo "[*] Running Nuclei scans..."
+# nuclei -l katana.txt \
+#   -severity medium,high,critical \
+#   -exclude-tags dos,fuzz \
+#   -c 50 -rl 150 \
+#   -silent \
+#   -o nuclei.txt
+
+    #increse speed safely
+# nuclei -l katana.txt \
+#   -c 50 \
+#   -rl 150 \
+#   -timeout 10 \
+#   -severity medium,high,critical \
+#   -silent
+ 
+    # scans only useful bug classes:
+# nuclei -l katana.txt \
+#   -tags xss,sqli,lfi,ssrf,open-redirect \
+#   -severity medium,high,critical
+
+    #program-safe
+# nuclei -l katana.txt \
+#   -exclude-tags dos,fuzz,bruteforce \
+#   -severity medium,high,critical
+
+    #CVE-only hunting (fast money)
+# nuclei -l katana.txt \
+#   -tags cve \
+#   -severity high,critical
+  
+    #API & GRAPHQL hunting
+#nuclei -l katana.txt -tags api,graphql
+
+    #scan logged-in surfaces.
+# nuclei -l katana.txt \
+#   -H "Cookie: session=abcdef12345"
+
+    #Extract secrets instead of just vulns
+#nuclei -tags token,apikey,exposure
+#AWS key,firebase configs, JWTS, Internal URLs
+
+
 
 # Directory Fuzzing (LIMITED THREADS)
 echo "[*] Running directory fuzzing..."
 
-sed 's/ \[.*$//' live.txt > clean_live.txt
 mkdir -p ffuf
-
 while read -r url; do
-  host=$(echo "$url" | sed 's#https\?://##')
+  [ -z "$url" ] && continue
+  # normalize hostname for filename
+  host=$(echo "$url" | sed 's#https\?://##; s#/##g')
   echo "[*] Fuzzing $url"
-
   ffuf -u "$url/FUZZ" \
     -w /usr/share/wordlists/dirb/common.txt \
     -mc 200,301,302,403 \
     -t 10 \
+    -rate 50 \
+    -timeout 10 \
     -of json \
     -o "ffuf/${host}.json"
+done < live.txt
 
-done < clean_live.txt
+
+echo "[*] Extracting endpoints from js"
+cat katana.txt \
+| sed 's#https\?://[^/]*##' \
+| awk -F'/' '{print "/"$2}' \
+| sort -u > discovered_dirs.txt
+
+# echo "[*] Feroxbuster (recursive deep scan)"
+# feroxbuster -u https://$TARGET \
+#   -w /usr/share/wordlists/dirb/common.txt \
+#   -d 2 \
+#   -q
 
 
 echo "[[[*]]] Reconnaissance complete!"
