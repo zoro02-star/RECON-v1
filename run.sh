@@ -42,7 +42,7 @@ $HTTPX -l all_subs.txt \
 
 # Katana  url crawleling 
 echo "[*] Crawling with Katana"
-$KATANA -l live.txt \
+$KATANA -list live.txt \
   -depth 2 \
   -js-crawl \
   -known-files all \
