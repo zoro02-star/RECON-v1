@@ -3,21 +3,33 @@
 DOMAINS="domains.txt"
 OUTDIR="bounty-results"
 KEYWORDS="responsible|disclosure|security.txt|bug|bounty|reward|hall.of.fame|white.hat"
+GAU="$HOME/go/bin/gau"
 
-HTTPX=$HOME/go/bin/httpx
-GAU=$HOME/go/bin/gau
 mkdir -p "$OUTDIR"
 
-echo "[+] Scanning domains for disclosure / bounty pages..."
+# =========================
+# PARALLEL ARCHIVE DISCOVERY
+# =========================
 
-# 1️⃣ Archive discovery
-while read -r d; do
-  echo "[*] $d"
-  $GAU "$d" 2>/dev/null \
+process_domain() {
+  d="$1"
+  gau "$d" 2>/dev/null \
     | grep -Ei "$KEYWORDS" \
     | sed "s#^#[$d] #" \
-    >> "$OUTDIR/raw_hits.txt"
-done < "$DOMAINS"
+    >> "$OUTDIR/raw_hits_$d.txt"
+}
+
+export -f process_domain
+export KEYWORDS OUTDIR
+
+echo "[+] Scanning domains in parallel..."
+
+cat "$DOMAINS" \
+ | xargs -P 10 -I {} bash -c 'process_domain "$@"' _ {}
+
+cat "$OUTDIR"/raw_hits_*.txt > "$OUTDIR/raw_hits.txt"
+rm "$OUTDIR"/raw_hits_*.txt
+
 
 # 2️⃣ Deduplicate
 sort -u "$OUTDIR/raw_hits.txt" > "$OUTDIR/unique_hits.txt"
