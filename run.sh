@@ -1,4 +1,5 @@
 #!/bin/bash
+#this is a recon that scan all subdomain, filter live hosts, katana url crawling , nuclie scans fuzzing direcotaries of all subdomains, extract endpoint from js files that came from katana crawling 
 
 if [ -z "$1" ]; then
     echo "Usage: $0 domain.com"
