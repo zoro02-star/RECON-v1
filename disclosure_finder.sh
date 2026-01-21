@@ -5,6 +5,13 @@ OUTDIR="bounty-results"
 KEYWORDS="responsible|disclosure|security.txt|bug|bounty|reward|hall.of.fame|white.hat"
 GAU="$HOME/go/bin/gau"
 
+
+TOTAL_DOMAINS=$(wc -l < "$DOMAINS")
+PROGRESS_DIR="$OUTDIR/progress"
+mkdir -p "$PROGRESS_DIR"
+rm -f "$PROGRESS_DIR"/*.done
+export PROGRESS_DIR TOTAL_DOMAINS
+
 mkdir -p "$OUTDIR"
 
 # =========================
@@ -13,19 +20,48 @@ mkdir -p "$OUTDIR"
 
 process_domain() {
   d="$1"
+  safe_d=$(echo "$d" | tr '/:' '_')
+
   gau "$d" 2>/dev/null \
     | grep -Ei "$KEYWORDS" \
     | sed "s#^#[$d] #" \
-    >> "$OUTDIR/raw_hits_$d.txt"
+    >> "$OUTDIR/raw_hits_$safe_d.txt"
+
+  touch "$PROGRESS_DIR/$safe_d.done"
 }
 
+
 export -f process_domain
-export KEYWORDS OUTDIR
+export KEYWORDS OUTDIR PROGRESS_DIR
+
+progress_domains() {
+  while true; do
+    DONE=$(ls "$PROGRESS_DIR" 2>/dev/null | wc -l)
+    PERCENT=$(( DONE * 100 / TOTAL_DOMAINS ))
+
+    printf "\r[+] Domain scan progress: %d/%d (%d%%)" \
+      "$DONE" "$TOTAL_DOMAINS" "$PERCENT"
+
+    if [ "$DONE" -ge "$TOTAL_DOMAINS" ]; then
+      echo
+      break
+    fi
+
+    sleep 1
+  done
+}
+
 
 echo "[+] Scanning domains in parallel..."
 
+progress_domains &     # 👈 START progress
+PB_PID=$!
+
 cat "$DOMAINS" \
  | xargs -P 10 -I {} bash -c 'process_domain "$@"' _ {}
+
+wait                   # wait for workers
+kill "$PB_PID" 2>/dev/null
 
 cat "$OUTDIR"/raw_hits_*.txt > "$OUTDIR/raw_hits.txt"
 rm "$OUTDIR"/raw_hits_*.txt
@@ -69,7 +105,13 @@ UNKNOWN="$OUTDIR/unknown.txt"
 > "$HOF"
 > "$UNKNOWN"
 
+TOTAL_URLS=$(wc -l < "$OUTDIR/live_bounty_pages.txt")
+COUNT=0
+
 while read -r line; do
+  COUNT=$((COUNT + 1))
+  printf "\r[+] Classifying: %d/%d" "$COUNT" "$TOTAL_URLS"
+
   url=$(echo "$line" | awk '{print $1}')
 
   body=$(curl -Ls --max-time 10 "$url" | tr 'A-Z' 'a-z')
