@@ -4,6 +4,7 @@ DOMAINS="domains.txt"
 OUTDIR="bounty-results"
 KEYWORDS="responsible|disclosure|security.txt|bug|bounty|reward|hall.of.fame|white.hat"
 GAU="$HOME/go/bin/gau"
+HTTPX="$HOME/go/bin/httpx"
 
 
 TOTAL_DOMAINS=$(wc -l < "$DOMAINS")
