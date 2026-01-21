@@ -4,7 +4,6 @@ DOMAINS="domains.txt"
 OUTDIR="bounty-results"
 KEYWORDS="responsible|disclosure|security.txt|bug|bounty|reward|hall.of.fame|white.hat"
 GAU="$HOME/go/bin/gau"
-HTTPX="$HOME/go/bin/httpx"
 
 
 TOTAL_DOMAINS=$(wc -l < "$DOMAINS")
@@ -79,7 +78,7 @@ awk '{print $2}' "$OUTDIR/unique_hits.txt" > "$OUTDIR/urls_only.txt"
 echo "[+] Checking which pages are LIVE..."
 
 # 4️⃣ LIVE validation (REAL pages only)
-$HTTPX -l "$OUTDIR/urls_only.txt" \
+httpx -l "$OUTDIR/urls_only.txt" \
   -silent \
   -mc 200,301,302 \
   -follow-redirects \
