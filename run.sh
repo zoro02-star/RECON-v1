@@ -30,7 +30,7 @@ echo "[*] Sorting, de-duplicating & excluding unwanted subs"
 cat subfinder.txt assetfinder.txt amass.txt \
 | tr '[:upper:]' '[:lower:]' \
 | sed 's/^https\?:\/\///' \
-| grep -vFf exclude.txt \
+| grep -vFf /home/harsh/recon/exclude.txt \
 | sort -u > all_subs.txt
 
 # Probe Live Hosts (CLEAN output)
