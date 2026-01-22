@@ -1,13 +1,13 @@
 #!/bin/bash
-#this is a recon that scan all subdomain, filter live hosts, katana url crawling , nuclie scans fuzzing direcotaries of all subdomains, extract endpoint from js files that came from katana crawling 
 
 if [ -z "$1" ]; then
-    echo "Usage: $0 domain.com"
+    echo "Usage: $0 domain.com exclude.txt"
     exit 1
 fi
 
 # Variables
 TARGET=$1
+EXCLUDE=$2
 WORDLIST="/usr/share/wordlists/dirb/common.txt"
 THREADS=10
 HTTPX=$HOME/go/bin/httpx
@@ -23,14 +23,13 @@ mkdir -p recon && cd recon || exit
 echo "[*] Enumerating subdomains..."
 $SUBFINDER -d "$TARGET" -silent > subfinder.txt
 $ASSETFINDER --subs-only "$TARGET" > assetfinder.txt
-$AMASS enum -passive -d "$TARGET" -timeout 10 -max-dns-queries 200 -silent -o amass.txt
+$AMASS enum -passive -d "$TARGET" -timeout 10 -silent -o amass.txt
 
-# osrting de-duplicating & excluding unwanted subs (add subdomains that u want to remove exclude.txt)
 echo "[*] Sorting, de-duplicating & excluding unwanted subs"
 cat subfinder.txt assetfinder.txt amass.txt \
 | tr '[:upper:]' '[:lower:]' \
 | sed 's/^https\?:\/\///' \
-| grep -vFf /home/harsh/recon/exclude.txt \
+| grep -vFf $EXCLUDE \
 | sort -u > all_subs.txt
 
 # Probe Live Hosts (CLEAN output)
@@ -43,13 +42,12 @@ $HTTPX -l all_subs.txt \
   -content-length \
   -o live_info.txt
 
-# Katana  url crawleling 
+# Katana  url crawling 
 echo "[*] Crawling with Katana"
 $KATANA -list live.txt \
   -depth 2 \
   -js-crawl \
   -known-files all \
-  -automatic-form-fill \
   -silent \
   -o katana.txt
 
@@ -89,11 +87,7 @@ $KATANA -list live.txt \
   
     #API & GRAPHQL hunting
 #nuclei -l katana.txt -tags api,graphql
-
-    #scan logged-in surfaces.
-# nuclei -l katana.txt \
-#   -H "Cookie: session=abcdef12345"
-
+    
     #Extract secrets instead of just vulns
 #nuclei -tags token,apikey,exposure
 #AWS key,firebase configs, JWTS, Internal URLs
@@ -111,7 +105,7 @@ while read -r url; do
   echo "[*] Fuzzing $url"
   ffuf -u "$url/FUZZ" \
     -w /usr/share/wordlists/dirb/common.txt \
-    -mc 200,301,302,403 \
+    -mc 200,204,301,302,307,401,403 \
     -t 10 \
     -rate 50 \
     -timeout 10 \
