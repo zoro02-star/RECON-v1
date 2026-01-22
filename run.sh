@@ -1,13 +1,12 @@
 #!/bin/bash
 
 if [ -z "$1" ]; then
-    echo "Usage: $0 domain.com exclude.txt"
+    echo "Usage: $0 domain.com"
     exit 1
 fi
 
 # Variables
 TARGET=$1
-EXCLUDE=$2
 WORDLIST="/usr/share/wordlists/dirb/common.txt"
 THREADS=10
 HTTPX=$HOME/go/bin/httpx
@@ -17,30 +16,23 @@ SUBFINDER=$HOME/go/bin/subfinder
 ASSETFINDER=$HOME/go/bin/assetfinder
 
 echo "[*] Starting reconnaissance for $TARGET"
-mkdir -p recon && cd recon || exit
+mkdir -p recon-$TARGET && cd recon-$TARGET || exit
 
 # Subdomain Enumeration
 echo "[*] Enumerating subdomains..."
 $SUBFINDER -d "$TARGET" -silent > subfinder.txt
 $ASSETFINDER --subs-only "$TARGET" > assetfinder.txt
-$AMASS enum -passive -d "$TARGET" -timeout 10 -silent -o amass.txt
+#$AMASS enum -passive -d "$TARGET" -timeout 10 -silent -o amass.txt
 
-echo "[*] Sorting, de-duplicating & excluding unwanted subs"
-cat subfinder.txt assetfinder.txt amass.txt \
+echo "[*] Sorting, de-duplicating "
+cat subfinder.txt assetfinder.txt\
 | tr '[:upper:]' '[:lower:]' \
 | sed 's/^https\?:\/\///' \
-| grep -vFf $EXCLUDE \
 | sort -u > all_subs.txt
 
 # Probe Live Hosts (CLEAN output)
 echo "[*] Probing live hosts..."
-$HTTPX -l all_subs.txt -silent -o live.txt
-$HTTPX -l all_subs.txt \
-  -status-code \
-  -title \
-  -tech-detect \
-  -content-length \
-  -o live_info.txt
+$HTTPX -l all_subs.txt -silent -o live.txt 
 
 # Katana  url crawling 
 echo "[*] Crawling with Katana"
