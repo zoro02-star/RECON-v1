@@ -28,6 +28,7 @@ echo "[*] Sorting, de-duplicating "
 cat subfinder.txt assetfinder.txt\
 | tr '[:upper:]' '[:lower:]' \
 | sed 's/^https\?:\/\///' \
+| grep -Ev 'blog\.|university\.|humansofdata\.|docs' \
 | sort -u > all_subs.txt
 
 # Probe Live Hosts (CLEAN output)
