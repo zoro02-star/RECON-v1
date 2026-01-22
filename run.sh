@@ -25,11 +25,12 @@ $SUBFINDER -d "$TARGET" -silent > subfinder.txt
 $ASSETFINDER --subs-only "$TARGET" > assetfinder.txt
 $AMASS enum -passive -d "$TARGET" -timeout 10 -max-dns-queries 200 -silent -o amass.txt
 
-# Sorting and Removing all the dublicates
-echo "[*] Sorting and Removing all dublicated" 
+# osrting de-duplicating & excluding unwanted subs (add subdomains that u want to remove exclude.txt)
+echo "[*] Sorting, de-duplicating & excluding unwanted subs"
 cat subfinder.txt assetfinder.txt amass.txt \
 | tr '[:upper:]' '[:lower:]' \
 | sed 's/^https\?:\/\///' \
+| grep -vFf exclude.txt \
 | sort -u > all_subs.txt
 
 # Probe Live Hosts (CLEAN output)
